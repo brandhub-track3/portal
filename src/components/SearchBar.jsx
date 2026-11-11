@@ -1,4 +1,4 @@
-export function SearchBar({ value, onChange, onSubmit, placeholder = 'Search content, products and FAQs' }) {
+export function SearchBar({ value, onChange, onSubmit, id = 'global-search', placeholder = 'Search content, products and FAQs' }) {
   return (
     <form
       className="search-form"
@@ -7,11 +7,11 @@ export function SearchBar({ value, onChange, onSubmit, placeholder = 'Search con
         onSubmit(value)
       }}
     >
-      <label className="sr-only" htmlFor="global-search">
+      <label className="sr-only" htmlFor={id}>
         Search portal content
       </label>
       <input
-        id="global-search"
+        id={id}
         type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}

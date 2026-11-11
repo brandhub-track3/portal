@@ -761,6 +761,152 @@
   border: 0;
 }
 
+.hero-result-count {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: rgba(248, 251, 255, 0.78);
+}
+
+.filter-group {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-group legend,
+.filter-group > label {
+  margin-bottom: 10px;
+  color: #42577c;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.filter-option {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 0 !important;
+  color: #334762 !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+
+.filter-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #2f6df6;
+}
+
+.filter-count {
+  margin-left: auto;
+  color: #77849a;
+  font-size: 0.78rem;
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.active-filters .chip {
+  border-color: #d7e0f3;
+  background: #fff;
+  color: #344967;
+}
+
+.active-filters .clear-button {
+  padding: 8px;
+}
+
+.result-image,
+.detail-image {
+  width: 100%;
+  object-fit: cover;
+  background: #eaf0fb;
+}
+
+.result-image {
+  height: 180px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+}
+
+.image-fallback {
+  display: grid;
+  place-items: center;
+  color: #536b99;
+  font-weight: 700;
+  background: linear-gradient(135deg, #edf2ff, #dce8f8);
+}
+
+.result-author {
+  margin: 12px 0 0;
+  color: #677790;
+  font-size: 0.85rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 10px 0 24px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid rgba(19, 36, 56, 0.08);
+  border-radius: 14px;
+}
+
+.pagination button {
+  padding: 9px 14px;
+  border: 1px solid #d5deed;
+  border-radius: 9px;
+  background: #fff;
+  color: #244a9f;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  color: #929cad;
+  cursor: not-allowed;
+}
+
+.pagination label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination select {
+  padding: 6px 8px;
+  border: 1px solid #d5deed;
+  border-radius: 8px;
+}
+
+.detail-image {
+  max-height: 460px;
+  margin: 0 0 24px;
+  border-radius: 20px;
+}
+
+.detail-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.filter-api-error {
+  margin-top: 12px;
+  padding: 10px 14px;
+  color: #a63348;
+  background: #fff1f2;
+  border-radius: 10px;
+}
+
 @media (max-width: 820px) {
   .hero-panel {
     padding: 36px 24px;

@@ -1,6 +1,8 @@
 import { SearchBar } from '../components/SearchBar'
 
-export function HomePage({ searchQuery, setSearchQuery, handleSearchSubmit, featuredItems, onOpenDetail }) {
+export function HomePage({ searchQuery, setSearchQuery, handleSearchSubmit, featuredItems, onOpenDetail, isLoading, loadError, totalItems, sources, pagination, page, setPage, retry }) {
+  const sourceNames = (sources || []).map(({ value }) => value === 'drupal' ? 'Drupal' : value === 'wordpress' ? 'WordPress' : value)
+
   return (
     <section className="home-page">
       <div className="hero-panel">
@@ -10,7 +12,17 @@ export function HomePage({ searchQuery, setSearchQuery, handleSearchSubmit, feat
           From blog posts and product pages to support articles and FAQs, BrandHub helps teams find the right answer in seconds instead of hunting through endless systems.
         </p>
 
-        <SearchBar value={searchQuery} onChange={setSearchQuery} onSubmit={handleSearchSubmit} />
+        <SearchBar id="home-search" value={searchQuery} onChange={setSearchQuery} onSubmit={handleSearchSubmit} />
+        <p className="hero-result-count" aria-live="polite">
+          {isLoading ? 'Loading content…' : loadError ? loadError.message : `${totalItems || 0} published content pieces`}
+        </p>
+        {loadError?.requestId ? (
+          <details className="hero-api-details">
+            <summary>Technical details</summary>
+            <span>Request ID: {loadError.requestId}</span>
+          </details>
+        ) : null}
+        {loadError ? <button type="button" className="primary-button" onClick={retry}>Retry</button> : null}
 
         <div className="popular-searches" aria-label="Popular searches">
           {['Content strategy', 'Support docs', 'Drupal CMS', 'Brand guidelines'].map((item) => (
@@ -22,26 +34,23 @@ export function HomePage({ searchQuery, setSearchQuery, handleSearchSubmit, feat
 
         <div className="quick-stats" aria-label="Portal stats">
           <div>
-            <strong>12k+</strong>
-            <span>content pieces</span>
+            <strong>{isLoading ? '…' : totalItems}</strong>
+            <span>published content pieces</span>
           </div>
           <div>
-            <strong>3x</strong>
-            <span>faster discovery</span>
-          </div>
-          <div>
-            <strong>4 sources</strong>
-            <span>WordPress + Drupal</span>
+            <strong>{sourceNames.length || '—'}</strong>
+            <span>{sourceNames.length ? sourceNames.join(' + ') : 'content sources'}</span>
           </div>
         </div>
       </div>
 
-      <div className="featured-panel">
+      <section className="home-content-section" aria-label="Published content">
+        <div className="featured-panel">
         {featuredItems.map((item) => (
           <article key={item.id} className="feature-card">
             <div className="result-meta-row">
-              <span className="pill pill-source">{item.source}</span>
-              <span className="pill pill-type">{item.type}</span>
+              <span className="pill pill-source">{item.source === 'drupal' ? 'Drupal' : 'WordPress'}</span>
+              <span className="pill pill-type">{item.type === 'faq' ? 'FAQ' : item.type}</span>
             </div>
             <h3>{item.title}</h3>
             <p>{item.summary}</p>
@@ -50,7 +59,18 @@ export function HomePage({ searchQuery, setSearchQuery, handleSearchSubmit, feat
             </button>
           </article>
         ))}
-      </div>
+        {!isLoading && !loadError && featuredItems.length === 0 ? (
+          <p className="empty-state">No published content is available yet.</p>
+        ) : null}
+        </div>
+        {pagination?.totalPages > 1 ? (
+          <nav className="pagination" aria-label="Home content pages">
+            <button type="button" disabled={!pagination.hasPreviousPage} onClick={() => setPage(page - 1)}>Previous</button>
+            <span>Page {pagination.page} of {pagination.totalPages} · {totalItems} content pieces</span>
+            <button type="button" disabled={!pagination.hasNextPage} onClick={() => setPage(page + 1)}>Next</button>
+          </nav>
+        ) : null}
+      </section>
     </section>
   )
 }

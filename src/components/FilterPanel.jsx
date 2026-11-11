@@ -1,46 +1,106 @@
-export function FilterPanel({ filters, counts, onChange, onClear }) {
-  const selectOptions = {
-    source: ['all', 'WordPress', 'Drupal'],
-    type: ['all', 'article', 'case-study', 'product', 'faq'],
-    product: ['all', 'BrandHub Search', 'Customer Portal', 'Portal UX', 'Partner Portal', 'Insights Hub'],
-    tag: ['all', 'search', 'content strategy', 'taxonomy', 'support', 'retail', 'knowledge base', 'ux', 'filtering', 'content library', 'ai', 'integration', 'wordpress', 'drupal'],
-  }
+function formatLabel(value) {
+  if (value === 'faq') return 'FAQ'
+  if (value === 'wordpress') return 'WordPress'
+  return value
+    .split(/[_-]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
 
-  const buildOptions = (key) => {
-    const values = selectOptions[key]
+const supportedSources = ['drupal', 'wordpress']
+const supportedTypes = ['post', 'case_study', 'product', 'article', 'faq']
 
-    return values.map((value) => ({
-      label: value === 'all' ? 'All' : value,
+function completeOptions(supportedValues, apiOptions = []) {
+  const optionsByValue = new Map(
+    apiOptions.map((option) => [String(option.value).toLowerCase(), option]),
+  )
+
+  return [
+    ...supportedValues.map((value) => ({
       value,
-      count: value === 'all' ? Object.values(counts[key] || {}).reduce((sum, total) => sum + total, 0) : counts[key]?.[value] || 0,
-    }))
+      count: optionsByValue.get(value)?.count || 0,
+    })),
+    ...apiOptions.filter((option) => !supportedValues.includes(String(option.value).toLowerCase())),
+  ]
+}
+
+function OptionGroup({ title, name, options, selected, onToggle, disabled }) {
+  return (
+    <fieldset className="filter-group" disabled={disabled}>
+      <legend>{title}</legend>
+      {options.map(({ value, count }) => (
+        <label className="filter-option" key={value}>
+          <input
+            type="checkbox"
+            checked={selected.includes(value)}
+            onChange={() => onToggle(name, value)}
+          />
+          <span>{formatLabel(value)}</span>
+          <span className="filter-count">{count}</span>
+        </label>
+      ))}
+    </fieldset>
+  )
+}
+
+export function FilterPanel({ filters, options, onChange, onClear, disabled }) {
+  const sourceOptions = completeOptions(supportedSources, options.sources)
+  const typeOptions = completeOptions(supportedTypes, options.types)
+
+  const toggleOption = (key, value) => {
+    const selected = filters[key]
+    onChange(key, selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value])
   }
 
   return (
     <aside className="filter-panel" aria-label="Search filters">
       <div className="filter-header">
         <h2>Filters</h2>
-        <button type="button" className="clear-button" onClick={onClear}>
-          Clear all
-        </button>
+        <button type="button" className="clear-button" onClick={onClear}>Clear all</button>
       </div>
 
-      {Object.entries(selectOptions).map(([key, values]) => (
-        <div className="filter-group" key={key}>
-          <label htmlFor={`filter-${key}`}>{key.charAt(0).toUpperCase() + key.slice(1)}</label>
-          <select
-            id={`filter-${key}`}
-            value={filters[key]}
-            onChange={(event) => onChange(key, event.target.value)}
-          >
-            {buildOptions(key).map((option) => (
-              <option key={`${key}-${option.value}`} value={option.value}>
-                {option.label} {option.count > 0 ? `(${option.count})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
+      <OptionGroup
+        title="Source"
+        name="source"
+        options={sourceOptions}
+        selected={filters.source}
+        onToggle={toggleOption}
+        disabled={disabled}
+      />
+      <OptionGroup
+        title="Type"
+        name="type"
+        options={typeOptions}
+        selected={filters.type}
+        onToggle={toggleOption}
+        disabled={disabled}
+      />
+
+      <div className="filter-group">
+        <label htmlFor="filter-product">Product</label>
+        <select
+          id="filter-product"
+          value={filters.product}
+          disabled={disabled}
+          onChange={(event) => onChange('product', event.target.value)}
+        >
+          <option value="">All products</option>
+          {(options.products || []).map(({ value, count }) => (
+            <option key={value} value={value}>{value} ({count})</option>
+          ))}
+        </select>
+      </div>
+
+      <OptionGroup
+        title="Tags"
+        name="tag"
+        options={options.tags || []}
+        selected={filters.tag}
+        onToggle={toggleOption}
+        disabled={disabled}
+      />
     </aside>
   )
 }
