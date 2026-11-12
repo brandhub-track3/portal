@@ -63,7 +63,7 @@ export function DetailView({ item, isLoading, error, retry, onBack }) {
           {Array.isArray(item.tags) && item.tags.length ? (
             <div className="tag-row">{item.tags.map((tag) => <span key={tag} className="tag">#{tag}</span>)}</div>
           ) : null}
-          {item.url ? <a className="primary-button inline-link" href={item.url} target="_blank" rel="noreferrer">Open original source</a> : null}
+          {item.url ? <a className="primary-button inline-link" href={item.url} target="_blank" rel="noopener noreferrer">View Source</a> : null}
         </article>
       </div>
     </section>
