@@ -41,7 +41,7 @@ const handleSubmit = async (event) => {
   if (!validate()) {
     setStatus("error");
     return;
-  }
+  } 
 
   setStatus("loading");
 
