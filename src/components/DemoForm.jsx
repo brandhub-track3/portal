@@ -48,7 +48,7 @@ const handleSubmit = async (event) => {
   try {
     // Generate a unique ID for this submission.
     const submissionId = crypto.randomUUID();
-
+ 
     const payload = {
       submission_id: submissionId,
       name: formData.name.trim(),
