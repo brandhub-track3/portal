@@ -32,34 +32,71 @@ export function DemoForm() {
     return Object.keys(nextErrors).length === 0
   }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
+ 
+const API_URL = "http://localhost:8000/wordpress/wp-json/brandhub/v1/leads";
 
-    if (!validate()) {
-      setStatus('error')
-      return
-    }
+const handleSubmit = async (event) => {
+  event.preventDefault();
 
-    setStatus('loading')
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1200))
-      const payload = {
-        name: formData.name,
-        workEmail: formData.workEmail,
-        company: formData.company,
-        message: formData.message,
-      }
-
-      console.log('Demo request payload', payload)
-      setStatus('success')
-      setFormData(initialValues)
-      setErrors({})
-    } catch (error) {
-      setStatus('error')
-      console.error('Submission failed', error)
-    }
+  if (!validate()) {
+    setStatus("error");
+    return;
   }
+
+  setStatus("loading");
+
+  try {
+    // Generate a unique ID for this submission.
+    const submissionId = crypto.randomUUID();
+
+    const payload = {
+      submission_id: submissionId,
+      name: formData.name.trim(),
+      email: formData.workEmail.trim(),
+      company: formData.company.trim(),
+      message: formData.message.trim(),
+      consent: formData.consent,
+      website: formData.website
+    };
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Unable to submit demo request."
+      );
+    }
+
+    console.log("Demo request submitted", {
+      leadId: result.lead_id,
+      success: result.success
+    });
+
+    setStatus("success");
+    setFormData(initialValues);
+    setErrors({});
+
+  } catch (error) {
+    console.error("Demo submission failed:", error.message);
+    setStatus("error");
+
+  } finally {
+    setStatus((current) =>
+      current === "loading" ? "error" : current
+    );
+  }
+};
+
 
   const updateField = (key, value) => {
     setFormData((current) => ({ ...current, [key]: value }))
