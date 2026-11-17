@@ -1,6 +1,6 @@
-name: docker and cicd
+name: Docker CI/CD
 
-# Workflow man branch par push aur PR ke time chalega
+# Workflow main branch ke push aur pull request par chalega
 on:
   push:
     branches:
@@ -10,135 +10,160 @@ on:
     branches:
       - main
 
+# Repository read aur GHCR image publish permission
+permissions:
+  contents: read
+  packages: write
+
 jobs:
 
   # =========================================================
-  # CI JOB
+  # JOB 1: TEST AND BUILD REACT
   # =========================================================
   test-build:
     runs-on: ubuntu-latest
 
     steps:
 
-      # GitHub runner par repository code checkout karega
+      # GitHub runner par repository code download
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Node.js 20 setup karega
+      # Node.js setup
+      # Dockerfile Node 20 use karta hai, isliye CI me bhi Node 20 rakho
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
 
-      # package-lock.json ke exact dpendencies install karega
+      # package-lock.json se exact dependencies install
       - name: Install dependencies
         run: npm ci
 
-      # Test cases
-      # Abhi commented hai.
-      # Jab tests ready hon, uncomment kar dena.
+      # Tests ready hone ke baad uncomment karna
       # - name: Run tests
       #   run: npm test -- --run
 
-      # React application successfully build ho rahi hai ya nahi
+      # React application compilation verify
       - name: Build React application
+        env:
+          VITE_BRANDHUB_API_URL: ${{ secrets.VITE_BRANDHUB_API_URL }}
         run: npm run build
 
-      # Dockerfile successfully image bana raha hai ya nahi
-      - name: Build Docker image
-        run: docker build -t brandhub-react:${{ github.sha }} .
-
 
   # =========================================================
-  # CD / DEPLOYMENT JOB
+  # JOB 2: BUILD AND PUBLISH DOCKER IMAGE
   # =========================================================
-  deploy:
+  publish-image:
 
-    # test-build successful hone ke baad hi deploy chalega
+    # CI pass hone ke baad image publish hogi
     needs: test-build
 
     runs-on: ubuntu-latest
 
-    # Sirf main branch push par deployment.
-    # Pull Request par deployment nahi hoga.
+    # Pull Request par image publish nahi hogi
+    # Sirf main branch push par publish hogi
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # GitHub Secret wali private SSH key ko runner par create karo
+      # Docker image build ke liye source code checkout
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # GHCR me login
+      # GITHUB_TOKEN GitHub automatically provide karta hai
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker image build karo
+      #
+      # Do tags banenge:
+      # 1. Current commit SHA
+      # 2. latest
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ghcr.io/brandhub-track3/portal:${{ github.sha }} \
+            -t ghcr.io/brandhub-track3/portal:latest \
+            .
+
+      # Dono image tags GHCR par upload karo
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/brandhub-track3/portal:${{ github.sha }}
+          docker push ghcr.io/brandhub-track3/portal:latest
+
+
+  # =========================================================
+  # JOB 3: DEPLOY IMAGE TO EC2
+  # =========================================================
+  deploy:
+
+    # Image successfully publish hone ke baad deployment
+    needs: publish-image
+
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+
+      # GitHub Secret se temporary SSH private key create
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
 
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" \
+            > ~/.ssh/ec2_key
 
           chmod 600 ~/.ssh/ec2_key
 
-
-      # EC2 se SSH connection establish karke deployment
-      - name: Deploy to EC2
+      # EC2 par exact commit SHA image deploy
+      - name: Deploy Docker image to EC2
         run: |
-
           ssh \
             -o StrictHostKeyChecking=no \
             -i ~/.ssh/ec2_key \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "IMAGE_TAG='${{ github.sha }}' \
+             VITE_API_URL='${{ secrets.VITE_BRANDHUB_API_URL }}' \
+             bash -s" << 'EOF'
 
-            # Kisi command me error aaye to deployment stop
+            # Command fail hone par deployment stop
             set -e
 
-            # -------------------------------------------------
-            # FIRST DEPLOYMENT
-            # -------------------------------------------------
+            # Exact Git commit wali Docker image
+            IMAGE="ghcr.io/brandhub-track3/portal:${IMAGE_TAG}"
 
-            # Check karo repository pehle se EC2 par hai ya nahi
-            if [ ! -d "/home/ubuntu/brandhub-react/.git" ]; then
+            echo "Deploying image: ${IMAGE}"
 
-              cd /home/ubuntu
+            # GHCR se image download
+            docker pull "${IMAGE}"
 
-              # First deployment par repository clone hogi
-              git clone https://github.com/brandhub-track3/portal.git brandhub-react
+            # Previous container remove karo
+            # First deployment me container absent ho sakta hai,
+            # isliye || true use kiya hai
+            docker rm -f brandhub-react-container || true
 
-            else
+            # Downloaded Docker image se new container start
+            docker run -d \
+              --name brandhub-react-container \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e VITE_BRANDHUB_API_URL="${VITE_API_URL}" \
+              "${IMAGE}"
 
-              # ------------------------------------------------
-              # NEXT DEPLOYMENTS
-              # ------------------------------------------------
+            # Container status show karo
+            docker ps \
+              --filter "name=brandhub-react-container"
 
-              cd /home/ubuntu/brandhub-react
-
-              # Latest Git information lao
-              git fetch origin
-
-              # EC2 code ko latest main branch ke equal karo
-              git reset --hard origin/main
-
-            fi
-
-
-            # React project directory me jao
-            cd /home/ubuntu/brandhub-react
-
-
-            # -------------------------------------------------
-            # ENVIRONMENT VARIABLE
-            # -------------------------------------------------
-
-            # GitHub Secret se EC2 par .env automatically create hoga
-            echo "VITE_BRANDHUB_API_URL=${{ secrets.VITE_BRANDHUB_API_URL }}" > .env
-
-
-            # -------------------------------------------------
-            # DOCKER DEPLOYMENT
-            # -------------------------------------------------
-
-            # Latest code ki Docker image build karega
-            # aur container start/update karega
-            docker compose up -d --build
-
-
-            # Running container status GitHub Actions logs me dikhega
-            docker compose ps
+            # Old/unused Docker images delete karo
+            docker image prune -f
 
           EOF

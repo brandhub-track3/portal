@@ -1,5 +1,5 @@
 # Lightweight Node.js 20 image
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Container ke andar application directory
 WORKDIR /app
