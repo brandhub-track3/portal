@@ -1,6 +1,6 @@
 name: docker and cicd
 
-# Workflow main branch par push aur PR ke time chalega
+# Workflow man branch par push aur PR ke time chalega
 on:
   push:
     branches:
@@ -11,10 +11,15 @@ on:
       - main
 
 jobs:
+
+  # =========================================================
+  # CI JOB
+  # =========================================================
   test-build:
     runs-on: ubuntu-latest
 
     steps:
+
       # GitHub runner par repository code checkout karega
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,19 +31,114 @@ jobs:
           node-version: "20"
           cache: npm
 
-      # package-lock.json ke according dependencies install
+      # package-lock.json ke exact dependencies install karega
       - name: Install dependencies
         run: npm ci
 
-      # Test cases run
+      # Test cases
+      # Abhi commented hai.
+      # Jab tests ready hon, uncomment kar dena.
       # - name: Run tests
       #   run: npm test -- --run
 
-      # React application build check
+      # React application successfully build ho rahi hai ya nahi
       - name: Build React application
         run: npm run build
 
-      # Dockerfile se Docker image build
-      # github.sha current commit ka unique Git SHA hai
+      # Dockerfile successfully image bana raha hai ya nahi
       - name: Build Docker image
         run: docker build -t brandhub-react:${{ github.sha }} .
+
+
+  # =========================================================
+  # CD / DEPLOYMENT JOB
+  # =========================================================
+  deploy:
+
+    # test-build successful hone ke baad hi deploy chalega
+    needs: test-build
+
+    runs-on: ubuntu-latest
+
+    # Sirf main branch push par deployment.
+    # Pull Request par deployment nahi hoga.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+
+      # GitHub Secret wali private SSH key ko runner par create karo
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+
+          chmod 600 ~/.ssh/ec2_key
+
+
+      # EC2 se SSH connection establish karke deployment
+      - name: Deploy to EC2
+        run: |
+
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -i ~/.ssh/ec2_key \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+
+            # Kisi command me error aaye to deployment stop
+            set -e
+
+            # -------------------------------------------------
+            # FIRST DEPLOYMENT
+            # -------------------------------------------------
+
+            # Check karo repository pehle se EC2 par hai ya nahi
+            if [ ! -d "/home/ubuntu/brandhub-react/.git" ]; then
+
+              cd /home/ubuntu
+
+              # First deployment par repository clone hogi
+              git clone https://github.com/brandhub-track3/portal.git brandhub-react
+
+            else
+
+              # ------------------------------------------------
+              # NEXT DEPLOYMENTS
+              # ------------------------------------------------
+
+              cd /home/ubuntu/brandhub-react
+
+              # Latest Git information lao
+              git fetch origin
+
+              # EC2 code ko latest main branch ke equal karo
+              git reset --hard origin/main
+
+            fi
+
+
+            # React project directory me jao
+            cd /home/ubuntu/brandhub-react
+
+
+            # -------------------------------------------------
+            # ENVIRONMENT VARIABLE
+            # -------------------------------------------------
+
+            # GitHub Secret se EC2 par .env automatically create hoga
+            echo "VITE_BRANDHUB_API_URL=${{ secrets.VITE_BRANDHUB_API_URL }}" > .env
+
+
+            # -------------------------------------------------
+            # DOCKER DEPLOYMENT
+            # -------------------------------------------------
+
+            # Latest code ki Docker image build karega
+            # aur container start/update karega
+            docker compose up -d --build
+
+
+            # Running container status GitHub Actions logs me dikhega
+            docker compose ps
+
+          EOF
