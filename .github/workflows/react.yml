@@ -31,7 +31,7 @@ jobs:
           node-version: "20"
           cache: npm
 
-      # package-lock.json ke exact dependencies install karega
+      # package-lock.json ke exact dpendencies install karega
       - name: Install dependencies
         run: npm ci
 
