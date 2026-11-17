@@ -11,7 +11,7 @@ COPY package*.json ./
 # package-lock.json ke exact dependencies install karega
 RUN npm ci
 
-# Ab complete React project copy karo
+# Ab complete React projec copy karo
 COPY . .
 
 # Vite ko port 3000 par run karne ke liye
