@@ -1,0 +1,44 @@
+name: docker and cicd
+
+# Workflow main branch par push aur PR ke time chalega
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # GitHub runner par repository code checkout karega
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Node.js 20 setup karega
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      # package-lock.json ke according dependencies install
+      - name: Install dependencies
+        run: npm ci
+
+      # Test cases run
+      - name: Run tests
+        run: npm test -- --run
+
+      # React application build check
+      - name: Build React application
+        run: npm run build
+
+      # Dockerfile se Docker image build
+      # github.sha current commit ka unique Git SHA hai
+      - name: Build Docker image
+        run: docker build -t brandhub-react:${{ github.sha }} .
