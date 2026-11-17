@@ -1,0 +1,22 @@
+services:
+  react-app:
+
+    # Root directory ke Dockerfile ko use karega
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # EC2 par container ka naam
+    container_name: brandhub-react-container
+
+    # EC2/Docker restart hone par container automatically restart
+    restart: unless-stopped
+
+    # EC2 port 3000 -> container port 3000
+    ports:
+      - "3000:3000"
+
+    # .env me GitHub Actions jo value create karega
+    # woh container ke andar available hogi
+    environment:
+      VITE_BRANDHUB_API_URL: ${VITE_BRANDHUB_API_URL}
