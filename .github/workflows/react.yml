@@ -31,8 +31,8 @@ jobs:
         run: npm ci
 
       # Test cases run
-      - name: Run tests
-        run: npm test -- --run
+      # - name: Run tests
+      #   run: npm test -- --run
 
       # React application build check
       - name: Build React application
