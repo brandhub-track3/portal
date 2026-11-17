@@ -49,15 +49,30 @@ The portal loads listing and search results from `GET /content`, filter options 
 npm run build
 ```
 
+## Tests
+
+Run the API, filter/search UI, detail-page, routing, and SEO tests with:
+
+```bash
+npm test
+```
+
+The test runner uses Vitest with jsdom and React Testing Library. It is configured for a single worker to keep memory usage predictable on development machines.
+
+## SEO
+
+The portal sets page-specific document titles, meta descriptions, canonical URLs, Open Graph/Twitter metadata, and robots directives. The homepage also publishes `WebSite` structured data with a search action. Search result URLs and unresolved detail routes are marked `noindex,follow`; published detail pages use the content title and summary.
+
+This project is a client-rendered SPA, so route-specific metadata is applied after JavaScript runs. Search engines that do not render JavaScript may only see the default metadata in `index.html`; server-side rendering or pre-rendering would be needed for reliable metadata in social previews and non-JavaScript crawlers.
+
 ## Project structure
 
 ```text
 src/
+  api/
   components/
-  data/
   pages/
-  utils/
+  test/
   App.jsx
   main.jsx
 ```
-

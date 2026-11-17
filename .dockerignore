@@ -1,0 +1,29 @@
+# Local node_modules Docker ke andar copy nahi karna.
+# Docker khud "npm ci" se dependencies install karega.
+node_modules
+
+# Local production build copy nahi karni.
+# Agar dist generate hai toh ignore hoga.
+dist
+
+# Git history ki Docker image me need nahi hai.
+.git
+
+# GitHub configuration Docker image me required nahi.
+.github
+
+# Local environment files me sensitive/config values ho sakti hain.
+.env
+.env.local
+
+# Development logs ki container me requirement nahi.
+*.log
+npm-debug.log*
+
+# IDE-specific files ki Docker container me need nahi.
+.vscode
+.idea
+
+# OS generated files.
+.DS_Store
+Thumbs.db

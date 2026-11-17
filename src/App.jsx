@@ -3,6 +3,7 @@ import { Route, Routes, useLocation, useNavigate, useParams, useSearchParams } f
 import './App.css'
 import { getContent, getContentById, getFilters, getApiErrorMessage } from './api/brandhubApi'
 import { Header } from './components/Header'
+import { SeoMetadata } from './components/SeoMetadata'
 import { HomePage } from './pages/HomePage'
 import { SearchPage } from './pages/SearchPage'
 import { DetailPage } from './pages/DetailPage'
@@ -48,6 +49,7 @@ function readUrlState(params) {
 
 function DetailRoute({ onBack }) {
   const { id = '' } = useParams()
+  const location = useLocation()
   const [detailResponse, setDetailResponse] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
 
@@ -84,6 +86,8 @@ function DetailRoute({ onBack }) {
 
   const isCurrentResponse = detailResponse?.id === id && detailResponse?.retryCount === retryCount
   return (
+    <>
+    <SeoMetadata pathname={location.pathname} item={isCurrentResponse ? detailResponse.item : null} />
     <DetailPage
       item={isCurrentResponse ? detailResponse.item : null}
       isLoading={!isCurrentResponse}
@@ -91,6 +95,7 @@ function DetailRoute({ onBack }) {
       retry={() => setRetryCount((count) => count + 1)}
       onBack={onBack}
     />
+    </>
   )
 }
 
@@ -284,6 +289,8 @@ function App() {
           <Route
             path="/"
             element={
+              <>
+              <SeoMetadata pathname="/" />
               <HomePage
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -299,11 +306,14 @@ function App() {
                 setPage={changePage}
                 retry={() => setRetryCount((count) => count + 1)}
               />
+              </>
             }
           />
           <Route
             path="/search"
             element={
+              <>
+              <SeoMetadata pathname="/search" query={searchQuery} />
               <SearchPage
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -324,11 +334,12 @@ function App() {
                 setPage={changePage}
                 onOpenDetail={onOpenDetail}
               />
+              </>
             }
           />
           <Route path="/content/:id" element={<DetailRoute onBack={() => navigate(`/search${location.search}`)} />} />
-          <Route path="/demo" element={<DemoPage />} />
-          <Route path="*" element={<HomePage searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchSubmit={handleSearchSubmit} featuredItems={featuredItems} onOpenDetail={onOpenDetail} isLoading={isLoading} loadError={loadError} totalItems={pagination.totalItems} sources={filterOptions?.sources} pagination={pagination} page={page} setPage={changePage} retry={() => setRetryCount((count) => count + 1)} />} />
+          <Route path="/demo" element={<><SeoMetadata pathname="/demo" /><DemoPage /></>} />
+          <Route path="*" element={<><SeoMetadata pathname="/" /><HomePage searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchSubmit={handleSearchSubmit} featuredItems={featuredItems} onOpenDetail={onOpenDetail} isLoading={isLoading} loadError={loadError} totalItems={pagination.totalItems} sources={filterOptions?.sources} pagination={pagination} page={page} setPage={changePage} retry={() => setRetryCount((count) => count + 1)} /></>} />
         </Routes>
       </main>
     </div>
