@@ -1,6 +1,8 @@
 name: Docker CI/CD
 
-# main branch par push ya PR hone par workflow chalega
+# Workflow runs when:
+# 1. Code is pushed to main
+# 2. Pull Request is created/updated against main
 on:
   push:
     branches:
@@ -11,7 +13,9 @@ on:
       - main
 
 
-# Repository read aur GHCR image publish permissions
+# Required permissions:
+# contents: read   -> checkout repository
+# packages: write  -> push Docker image to GHCR
 permissions:
   contents: read
   packages: write
@@ -24,19 +28,18 @@ jobs:
   # =========================================================
   test-build:
 
-    # ubuntu-latest future me Ubuntu 26 par change ho raha hai.
-    # Isliye fixed Ubuntu 24.04 use kar rahe hain.
+    # Fixed Ubuntu version so ubuntu-latest changes
+    # do not unexpectedly affect the pipeline
     runs-on: ubuntu-24.04
 
     steps:
 
-      # Repository code GitHub runner par checkout karega.
-      # v5 newer action version use kar rahe hain.
+      # Download repository code on GitHub runner
       - name: Checkout code
         uses: actions/checkout@v5
 
 
-      # Node.js 24 setup karega.
+      # Install Node.js 24
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -44,17 +47,19 @@ jobs:
           cache: npm
 
 
-      # package-lock.json ke exact dependencies install karega
+      # Install exact dependencies from package-lock.json
       - name: Install dependencies
         run: npm ci
 
 
-      # Jab tests ready hon to uncomment karna
+      # Enable this once your test cases are ready
+      # If tests fail, further deployment will stop
+      #
       # - name: Run tests
       #   run: npm test -- --run
 
 
-      # React production build verify karega
+      # Verify React application builds successfully
       - name: Build React application
         env:
           VITE_BRANDHUB_API_URL: ${{ secrets.VITE_BRANDHUB_API_URL }}
@@ -67,33 +72,43 @@ jobs:
   # =========================================================
   publish-image:
 
-    # test-build successful hone ke baad hi chalega
+    # Run only after test-build succeeds
     needs: test-build
 
     runs-on: ubuntu-24.04
 
-    # PR par image publish nahi hogi.
-    # Sirf main branch push par publish hogi.
+    # Do not publish images for PR.
+    # Publish only after push/merge to main.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # Docker build ke liye repository checkout
+      # Checkout code because this is a separate GitHub runner/job
       - name: Checkout code
         uses: actions/checkout@v5
 
 
-      # GitHub Container Registry me login
+      # Login to GitHub Container Registry (GHCR)
+      #
+      # GITHUB_TOKEN is automatically created by GitHub.
+      # packages: write permission above allows image publishing.
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
 
-      # Docker image build
-      # Ek exact commit SHA tag aur ek latest tag create hoga
+      # Build Docker image from Dockerfile
+      #
+      # Two tags:
+      #
+      # 1. github.sha
+      #    Exact image for this Git commit
+      #
+      # 2. latest
+      #    Latest successfully published image
       - name: Build Docker image
         run: |
           docker build \
@@ -102,7 +117,7 @@ jobs:
             .
 
 
-      # Images GHCR me publish
+      # Upload both image tags to GHCR
       - name: Push Docker image
         run: |
           docker push ghcr.io/brandhub-track3/portal:${{ github.sha }}
@@ -111,32 +126,40 @@ jobs:
 
 
   # =========================================================
-  # JOB 3: DEPLOY IMAGE TO EC2
+  # JOB 3: DEPLOY DOCKER IMAGE TO AWS EC2
   # =========================================================
   deploy:
 
-    # Image successfully publish hone ke baad hi deploy
+    # The image must first successfully reach GHCR
     needs: publish-image
 
     runs-on: ubuntu-24.04
 
-    # Sirf main branch push par deploy
+    # Deploy only on main branch push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # EC2 SSH private key setup
+      # -------------------------------------------------------
+      # SSH SETUP
+      # -------------------------------------------------------
       - name: Setup SSH
         run: |
+
+          # Create SSH directory
           mkdir -p ~/.ssh
 
+          # Create temporary SSH private key from GitHub Secret
           printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" \
             > ~/.ssh/ec2_key
 
+          # SSH requires restricted permissions for private keys
           chmod 600 ~/.ssh/ec2_key
 
 
-      # Exact commit SHA wali Docker image EC2 par deploy
+      # -------------------------------------------------------
+      # EC2 DEPLOYMENT
+      # -------------------------------------------------------
       - name: Deploy Docker image to EC2
         run: |
 
@@ -148,26 +171,43 @@ jobs:
              VITE_API_URL='${{ secrets.VITE_BRANDHUB_API_URL }}' \
              bash -s" << 'EOF'
 
-            # Koi command fail hui to deployment stop
+            # Immediately stop deployment if a command fails
             set -e
 
 
-            # Exact Git commit wali Docker image
+            # -------------------------------------------------
+            # IMAGE
+            # -------------------------------------------------
+
+            # Deploy exact image belonging to this Git commit
             IMAGE="ghcr.io/brandhub-track3/portal:${IMAGE_TAG}"
 
             echo "Deploying image: ${IMAGE}"
 
 
-            # GHCR se exact Docker image pull
+            # -------------------------------------------------
+            # PULL IMAGE
+            # -------------------------------------------------
+
+            # Download exact Docker image from GHCR
             docker pull "${IMAGE}"
 
 
-            # Existing React container remove
-            # First deployment me container na ho to error ignore
+            # -------------------------------------------------
+            # REMOVE PREVIOUS CONTAINER
+            # -------------------------------------------------
+
+            # Stop and remove previous React container.
+            #
+            # || true is required because during first deployment
+            # the container might not exist.
             docker rm -f brandhub-react-container || true
 
 
-            # New image se container start
+            # -------------------------------------------------
+            # START NEW CONTAINER
+            # -------------------------------------------------
+
             docker run -d \
               --name brandhub-react-container \
               --restart unless-stopped \
@@ -176,12 +216,21 @@ jobs:
               "${IMAGE}"
 
 
-            # Running container verify
+            # -------------------------------------------------
+            # VERIFY DEPLOYMENT
+            # -------------------------------------------------
+
+            # Display running React container in Actions logs
             docker ps \
               --filter "name=brandhub-react-container"
 
 
-            # Unused old Docker images clean
+            # -------------------------------------------------
+            # CLEANUP
+            # -------------------------------------------------
+
+            # Delete unused Docker image layers/images
+            # to prevent EC2 disk from continually filling
             docker image prune -f
 
           EOF
