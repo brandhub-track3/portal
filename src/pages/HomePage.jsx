@@ -7,7 +7,7 @@ export function HomePage({ searchQuery, setSearchQuery, handleSearchSubmit, feat
     <section className="home-page">
       <div className="hero-panel">
         <p className="eyebrow">A better way to find what you need</p>
-        <h1>Search your content without bouncing between tools.</h1>
+        <h1>Search your content without bouncing between tools!.</h1>
         <p className="hero-copy">
           From blog posts and product pages to support articles and FAQs, BrandHub helps teams find the right answer in seconds instead of hunting through endless systems.
         </p>
