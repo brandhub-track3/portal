@@ -1,6 +1,6 @@
 name: Docker CI/CD
 
-# Workflow main branch ke push aur pull request par chalega
+# main branch par push ya PR hone par workflow chalega
 on:
   push:
     branches:
@@ -10,10 +10,12 @@ on:
     branches:
       - main
 
-# Repository read aur GHCR image publish permission
+
+# Repository read aur GHCR image publish permissions
 permissions:
   contents: read
   packages: write
+
 
 jobs:
 
@@ -21,35 +23,43 @@ jobs:
   # JOB 1: TEST AND BUILD REACT
   # =========================================================
   test-build:
-    runs-on: ubuntu-latest
+
+    # ubuntu-latest future me Ubuntu 26 par change ho raha hai.
+    # Isliye fixed Ubuntu 24.04 use kar rahe hain.
+    runs-on: ubuntu-24.04
 
     steps:
 
-      # GitHub runner par repository code download
+      # Repository code GitHub runner par checkout karega.
+      # v5 newer action version use kar rahe hain.
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # Node.js setup
-      # Dockerfile Node 20 use karta hai, isliye CI me bhi Node 20 rakho
+
+      # Node.js 24 setup karega.
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: npm
 
-      # package-lock.json se exact dependencies install
+
+      # package-lock.json ke exact dependencies install karega
       - name: Install dependencies
         run: npm ci
 
-      # Tests ready hone ke baad uncomment karna
+
+      # Jab tests ready hon to uncomment karna
       # - name: Run tests
       #   run: npm test -- --run
 
-      # React application compilation verify
+
+      # React production build verify karega
       - name: Build React application
         env:
           VITE_BRANDHUB_API_URL: ${{ secrets.VITE_BRANDHUB_API_URL }}
         run: npm run build
+
 
 
   # =========================================================
@@ -57,23 +67,23 @@ jobs:
   # =========================================================
   publish-image:
 
-    # CI pass hone ke baad image publish hogi
+    # test-build successful hone ke baad hi chalega
     needs: test-build
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
-    # Pull Request par image publish nahi hogi
-    # Sirf main branch push par publish hogi
+    # PR par image publish nahi hogi.
+    # Sirf main branch push par publish hogi.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # Docker image build ke liye source code checkout
+      # Docker build ke liye repository checkout
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # GHCR me login
-      # GITHUB_TOKEN GitHub automatically provide karta hai
+
+      # GitHub Container Registry me login
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -81,11 +91,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker image build karo
-      #
-      # Do tags banenge:
-      # 1. Current commit SHA
-      # 2. latest
+
+      # Docker image build
+      # Ek exact commit SHA tag aur ek latest tag create hoga
       - name: Build Docker image
         run: |
           docker build \
@@ -93,11 +101,13 @@ jobs:
             -t ghcr.io/brandhub-track3/portal:latest \
             .
 
-      # Dono image tags GHCR par upload karo
+
+      # Images GHCR me publish
       - name: Push Docker image
         run: |
           docker push ghcr.io/brandhub-track3/portal:${{ github.sha }}
           docker push ghcr.io/brandhub-track3/portal:latest
+
 
 
   # =========================================================
@@ -105,16 +115,17 @@ jobs:
   # =========================================================
   deploy:
 
-    # Image successfully publish hone ke baad deployment
+    # Image successfully publish hone ke baad hi deploy
     needs: publish-image
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
+    # Sirf main branch push par deploy
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # GitHub Secret se temporary SSH private key create
+      # EC2 SSH private key setup
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -124,9 +135,11 @@ jobs:
 
           chmod 600 ~/.ssh/ec2_key
 
-      # EC2 par exact commit SHA image deploy
+
+      # Exact commit SHA wali Docker image EC2 par deploy
       - name: Deploy Docker image to EC2
         run: |
+
           ssh \
             -o StrictHostKeyChecking=no \
             -i ~/.ssh/ec2_key \
@@ -135,23 +148,26 @@ jobs:
              VITE_API_URL='${{ secrets.VITE_BRANDHUB_API_URL }}' \
              bash -s" << 'EOF'
 
-            # Command fail hone par deployment stop
+            # Koi command fail hui to deployment stop
             set -e
+
 
             # Exact Git commit wali Docker image
             IMAGE="ghcr.io/brandhub-track3/portal:${IMAGE_TAG}"
 
             echo "Deploying image: ${IMAGE}"
 
-            # GHCR se image download
+
+            # GHCR se exact Docker image pull
             docker pull "${IMAGE}"
 
-            # Previous container remove karo
-            # First deployment me container absent ho sakta hai,
-            # isliye || true use kiya hai
+
+            # Existing React container remove
+            # First deployment me container na ho to error ignore
             docker rm -f brandhub-react-container || true
 
-            # Downloaded Docker image se new container start
+
+            # New image se container start
             docker run -d \
               --name brandhub-react-container \
               --restart unless-stopped \
@@ -159,11 +175,13 @@ jobs:
               -e VITE_BRANDHUB_API_URL="${VITE_API_URL}" \
               "${IMAGE}"
 
-            # Container status show karo
+
+            # Running container verify
             docker ps \
               --filter "name=brandhub-react-container"
 
-            # Old/unused Docker images delete karo
+
+            # Unused old Docker images clean
             docker image prune -f
 
           EOF
