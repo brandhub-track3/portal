@@ -211,7 +211,7 @@ jobs:
             docker run -d \
               --name brandhub-react-container \
               --restart unless-stopped \
-              -p 3000:3000 \
+              -p 80:3000 \
               -e VITE_BRANDHUB_API_URL="${VITE_API_URL}" \
               "${IMAGE}"
 
