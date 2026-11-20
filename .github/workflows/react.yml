@@ -1,8 +1,5 @@
 name: Docker CI/CD
 
-# Workflow runs when:
-# 1. Code is pushed to main
-# 2. Pull Request is created/updated against main
 on:
   push:
     branches:
@@ -13,9 +10,6 @@ on:
       - main
 
 
-# Required permissions:
-# contents: read   -> checkout repository
-# packages: write  -> push Docker image to GHCR
 permissions:
   contents: read
   packages: write
@@ -23,23 +17,16 @@ permissions:
 
 jobs:
 
-  # =========================================================
-  # JOB 1: TEST AND BUILD REACT
-  # =========================================================
   test-build:
 
-    # Fixed Ubuntu version so ubuntu-latest changes
-    # do not unexpectedly affect the pipeline
     runs-on: ubuntu-24.04
 
     steps:
 
-      # Download repository code on GitHub runner
       - name: Checkout code
         uses: actions/checkout@v5
 
 
-      # Install Node.js 24
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -47,19 +34,14 @@ jobs:
           cache: npm
 
 
-      # Install exact dependencies from package-lock.json
       - name: Install dependencies
         run: npm ci
 
 
-      # Enable this once your test cases are ready
-      # If tests fail, further deployment will stop
-      #
       # - name: Run tests
       #   run: npm test -- --run
 
 
-      # Verify React application builds successfully
       - name: Build React application
         env:
           VITE_BRANDHUB_API_URL: ${{ secrets.VITE_BRANDHUB_API_URL }}
@@ -67,31 +49,19 @@ jobs:
 
 
 
-  # =========================================================
-  # JOB 2: BUILD AND PUBLISH DOCKER IMAGE
-  # =========================================================
   publish-image:
 
-    # Run only after test-build succeeds
     needs: test-build
 
     runs-on: ubuntu-24.04
 
-    # Do not publish images for PR.
-    # Publish only after push/merge to main.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # Checkout code because this is a separate GitHub runner/job
       - name: Checkout code
         uses: actions/checkout@v5
 
-
-      # Login to GitHub Container Registry (GHCR)
-      #
-      # GITHUB_TOKEN is automatically created by GitHub.
-      # packages: write permission above allows image publishing.
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -100,15 +70,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
 
-      # Build Docker image from Dockerfile
-      #
-      # Two tags:
-      #
-      # 1. github.sha
-      #    Exact image for this Git commit
-      #
-      # 2. latest
-      #    Latest successfully published image
+
       - name: Build Docker image
         run: |
           docker build \
@@ -116,8 +78,6 @@ jobs:
             -t ghcr.io/brandhub-track3/portal:latest \
             .
 
-
-      # Upload both image tags to GHCR
       - name: Push Docker image
         run: |
           docker push ghcr.io/brandhub-track3/portal:${{ github.sha }}
@@ -125,24 +85,16 @@ jobs:
 
 
 
-  # =========================================================
-  # JOB 3: DEPLOY DOCKER IMAGE TO AWS EC2
-  # =========================================================
   deploy:
 
-    # The image must first successfully reach GHCR
     needs: publish-image
 
     runs-on: ubuntu-24.04
 
-    # Deploy only on main branch push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
 
-      # -------------------------------------------------------
-      # SSH SETUP
-      # -------------------------------------------------------
       - name: Setup SSH
         run: |
 
@@ -157,9 +109,7 @@ jobs:
           chmod 600 ~/.ssh/ec2_key
 
 
-      # -------------------------------------------------------
-      # EC2 DEPLOYMENT
-      # -------------------------------------------------------
+
       - name: Deploy Docker image to EC2
         run: |
 
